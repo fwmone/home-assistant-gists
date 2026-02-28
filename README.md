@@ -93,6 +93,10 @@ A hands-on comparison of common smart home hubs, focusing on real-world usabilit
 
 This article outlines the core principles that make a Home Assistant smart home stable, comprehensible, and genuinely useful in the long run — beyond gimmicks and feature overload.
 
+**5. [eInk Photo Frames from BLOOMIN8 and paperlesspaper](https://medium.com/@fwmone/eink-photo-frames-from-bloomin8-and-paperlesspaper-26c04d9bbf93) / [eInk-Bilderrahmen von BLOOMIN8 und paperlesspaper](https://medium.com/@fwmone/eink-bilderrahmen-von-bloomin8-und-paperlesspaper-a52f8fc84cf4)**
+
+An experience-based look at eInk photo frames and how they can bring photos back into everyday life through local, automated integration with Home Assistant.
+
 # Scripts
 ## immich_sync_favorites
 

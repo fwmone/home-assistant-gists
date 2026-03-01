@@ -18,6 +18,7 @@ things that solved a concrete problem, improved robustness or performance, or he
     - [What it does](#what-it-does)
     - [Intended use case](#intended-use-case)
     - [Home Assistant integration](#home-assistant-integration)
+    - [Why is the API Key not in secrets.yaml?](#why-is-the-api-key-not-in-secretsyaml)
     - [Configuration overview](#configuration-overview)
     - [Automation](#automation)
     - [Notes \& limitations](#notes--limitations)
@@ -143,22 +144,45 @@ The script is usually invoked via a `shell_command` in `configuration.yaml`, wit
 ```yaml
 shell_command:
   immich_sync_favorites: >-
-    /bin/bash -c 'IMMICH_BASE="http://immich.local:2283"
-    EPDOPTIMIZE="http://eink-optimize.local:3030/optimize"
+    /bin/bash -c 'IMMICH_BASE="http://example.immich.local:2283"
+    EINKOPTIMIZE="http://example.eink-optimize.local:3030/optimize"
     HOMEASSISTANT_PUBLIC_ADDRESS="https://homeassistant.example.com"
     DEST_DIR_ORIGINALS="/config/www/picture-frames/originals"
     PUBLISH_DIR="/local/picture-frames/originals"
     DEST_DIR_BLOOMIN8="/media/picture-frames/bloomin8"
     DEST_DIR_PAPERLESSPAPER="/media/picture-frames/paperlesspaper"    
-    IMMICH_API_KEY="{{ secrets.immich_api_key }}"
+    IMMICH_API_KEY="YOUR_IMMICH_API_KEY"
     nohup /config/scripts/immich_sync_favorites.sh
     >/config/scripts/immich_sync_favorites.log 2>&1 &'
 ```
 
+### Why is the API Key not in secrets.yaml?
+
+!secret only works as a YAML tag for a complete value, not “inline” in the middle of a string. If you write IMMICH_API_KEY="!secret immich_api_key", HA will simply treat it as a normal string – and bash will receive exactly that string.
+
+If you want to have the API key in `secrets.yaml`, the most pragmatic and robust option is to hide the entire command, leaving `configuration.yaml` clean:
+
 In `secrets.yaml`:
 
 ```yaml
-immich_api_key: "YOUR_IMMICH_API_KEY"
+immich_sync_favorites_cmd: >-
+  /bin/bash -c 'IMMICH_BASE="http://example.immich.local:2283"
+  EINKOPTIMIZE="http://example.eink-optimize.local:3030/optimize"
+  HOMEASSISTANT_PUBLIC_ADDRESS="https://homeassistant.example.com"
+  DEST_DIR_ORIGINALS="/config/www/picture-frames/originals"
+  PUBLISH_DIR="/local/picture-frames/originals"
+  DEST_DIR_BLOOMIN8="/media/picture-frames/bloomin8"
+  DEST_DIR_PAPERLESSPAPER="/media/picture-frames/paperlesspaper"
+  IMMICH_API_KEY="YOUR_IMMICH_API_KEY"
+  nohup /config/scripts/immich_sync_favorites.sh
+  >/config/scripts/immich_sync_favorites.log 2>&1 &'
+```
+
+In `configuration.yaml`:
+
+```yaml
+shell_command:
+  immich_sync_favorites: !secret immich_sync_favorites_cmd
 ```
 
 ### Configuration overview

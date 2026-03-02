@@ -183,6 +183,37 @@ In `configuration.yaml`:
 ```yaml
 shell_command:
   immich_sync_favorites: !secret immich_sync_favorites_cmd
+
+command_line:
+  - sensor:
+      name: "Immich Sync Raw"
+      command: "cat /config/scripts/immich_sync_favorites.status 2>/dev/null || echo 'unknown||'"
+      scan_interval: 86400
+
+template:
+  - sensor:
+      - name: "Immich Sync Status"
+        state: >
+          {% set parts = states('sensor.immich_sync_raw').split('|') %}
+          {{ parts[0] if parts|length > 0 else 'unknown' }}
+
+      - name: "Immich Sync Timestamp"
+        state: >
+          {% set parts = states('sensor.immich_sync_raw').split('|') %}
+          {{ parts[1] if parts|length > 1 else '' }}
+
+      - name: "Immich Sync Error"
+        state: >
+          {% set parts = states('sensor.immich_sync_raw').split('|') %}
+          {{ parts[2] if parts|length > 2 else '' }}
+        # Optional: Leeres Feld nicht als "unknown" behandeln
+        availability: >
+          {{ states('sensor.immich_sync_raw') not in ['unknown', 'unavailable'] }}
+
+  - binary_sensor:
+      - name: "Immich Sync OK"
+        state: >
+          {{ states('sensor.immich_sync_status') == 'ok' }}
 ```
 
 ### Configuration overview

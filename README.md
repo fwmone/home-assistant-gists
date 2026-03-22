@@ -31,6 +31,31 @@ things that solved a concrete problem, improved robustness or performance, or he
     - [🔁 Rotating Warning Display](#-rotating-warning-display)
     - [🔗 Optional Click Actions](#-optional-click-actions)
     - [💡 Notes](#-notes)
+  - [🏠 Home Assistant Room Cards (Button Card Templates)](#-home-assistant-room-cards-button-card-templates)
+    - [✨ Concept](#-concept)
+    - [📦 Requirements](#-requirements-1)
+      - [Required](#required)
+      - [Optional](#optional)
+    - [📥 Installing the Templates](#-installing-the-templates)
+      - [Step 1: Open your dashboard in YAML mode](#step-1-open-your-dashboard-in-yaml-mode)
+      - [Step 2: Add the templates](#step-2-add-the-templates)
+      - [Important](#important)
+      - [Example Structure](#example-structure)
+      - [Step 3: Save and reload](#step-3-save-and-reload)
+    - [💡 Alternative: Using !include (advanced)](#-alternative-using-include-advanced)
+    - [Tip](#tip)
+    - [🧠 How It Works](#-how-it-works-1)
+    - [⚙️ Basic Usage](#️-basic-usage)
+    - [🔘 Custom Buttons](#-custom-buttons)
+    - [📐 Layout (Responsive Design)](#-layout-responsive-design)
+      - [Behavior](#behavior)
+    - [🎨 Design Details](#-design-details)
+    - [🔧 Customization](#-customization)
+      - [Change Main Entity](#change-main-entity)
+      - [Add / Remove Buttons](#add--remove-buttons)
+      - [Adjust Button Size (Mobile)](#adjust-button-size-mobile)
+      - [Modify Colors](#modify-colors)
+    - [🚀 Why Templates?](#-why-templates)
 - [Scripts](#scripts)
   - [immich\_sync\_favorites](#immich_sync_favorites)
     - [What it does](#what-it-does)
@@ -120,6 +145,8 @@ An experience-based look at eInk photo frames and how they can bring photos back
 
 # Dashboard
 ## 🌤️ Home Assistant Weather Card (Custom Dashboard Card)
+
+Get the code [here](https://github.com/fwmone/home-assistant-gists/blob/main/dashboard/weather-card.yaml).
 
 ![Home Assistant Weather Card](/README/weather-card.png)
 
@@ -258,6 +285,266 @@ You can remove or customize this.
 - The layout is optimized for a clean, compact dashboard design
 - Works great as part of a main dashboard view
 - Designed for both desktop and mobile usage
+
+## 🏠 Home Assistant Room Cards (Button Card Templates)
+
+Get the code [here](https://github.com/fwmone/home-assistant-gists/blob/main/dashboard/room-card.yaml).
+
+![Room Card](README/room-card.png)
+
+These Room Cards are a modular and highly performant alternative to Mushroom-style room dashboards.
+
+They are built using `button-card` templates and are designed to:
+
+- provide a clean and consistent UI
+- minimize duplicated code
+- remain highly flexible and customizable
+- work efficiently on both desktop and mobile devices
+
+### ✨ Concept
+
+Each Room Card consists of two main parts:
+
+- **Main Icon (left)**
+  - Represents the entire room or group (e.g. all lights)
+  - Typically linked to a group entity
+  - Supports toggle and more-info actions
+
+- **Action Buttons (right)**
+  - Up to 4 individual controls
+  - Fully customizable (tap / hold actions, icons, entities)
+
+This creates a compact, intuitive control surface for each room.
+
+### 📦 Requirements
+
+#### Required
+
+- [`button-card`](https://github.com/custom-cards/button-card)
+- [`vertical-stack-in-card`](https://github.com/ofekashery/vertical-stack-in-card)
+- [`card-mod`](https://github.com/thomasloven/lovelace-card-mod)
+
+#### Optional
+
+- [`layout-card`](https://github.com/thomasloven/lovelace-layout-card)
+
+
+### 📥 Installing the Templates
+
+To use the Room Cards, you need to add the template definitions from []`room-card.yaml`](https://github.com/fwmone/home-assistant-gists/blob/main/dashboard/room-card.yaml) to your Home Assistant dashboard configuration.
+
+#### Step 1: Open your dashboard in YAML mode
+
+Go to:
+
+**Settings → Dashboards → (your dashboard) → Edit → Raw configuration editor**
+
+#### Step 2: Add the templates
+
+Add at the end of your dashboard YAML (not inside a view!):
+
+```yaml
+button_card_templates:
+  # Paste the full content of room-card.yaml here
+```
+
+#### Important
+
+* The `button_card_templates` section must be defined **once per dashboard**
+* It must be placed **outside of `views:`**
+* Do not nest it inside cards or layouts
+
+#### Example Structure
+
+```yaml
+views:
+  - title: Home
+    path: home
+    cards:
+      - type: custom:button-card
+        template: room_card
+        name: Living Room
+        icon: mdi:sofa
+        entity: light.living_room
+
+button_card_templates:
+  # your templates here
+```
+
+#### Step 3: Save and reload
+
+- Save your dashboard
+- If needed: reload the browser or clear cache
+- No Home Assistant restart required
+
+### 💡 Alternative: Using !include (advanced)
+
+If you maintain multiple dashboards or want cleaner YAML, you can also externalize the templates:
+
+```yaml
+button_card_templates: !include room-card.yaml
+```
+
+This requires your dashboard to be YAML-based and your file to be located in your Home Assistant config directory.
+
+### Tip
+
+If something doesn't work:
+
+- Check the browser console (F12)
+- Verify that all required custom cards are installed
+- Make sure the template name (`room_card`, `room_button`) matches exactly
+
+### 🧠 How It Works
+
+The Room Cards are powered by reusable `button-card` templates:
+
+- `room_card` → main container
+- `room_button_base` → base style for small buttons
+- `room_button` → active state styling
+
+### ⚙️ Basic Usage
+
+Example Room Card:
+
+```yaml
+type: custom:button-card
+template: room_card
+name: Light
+icon: mdi:home
+entity: switch.lampen_haus
+custom_fields:
+  btn:
+    card:
+      type: vertical-stack
+      cards:
+        - type: custom:button-card
+          template: room_button
+          entity: switch.lampen_dachgeschoss
+        - type: custom:button-card
+          template: room_button
+          entity: switch.lampen_erdgeschoss
+        - type: custom:button-card
+          template: room_button
+          entity: switch.lampen_untergeschoss
+```
+
+### 🔘 Custom Buttons
+
+Each button is fully customizable.
+
+Example with custom icon and action:
+
+```yaml
+type: custom:button-card
+template: room_button
+icon: mdi:lava-lamp
+entity: switch.liebeslicht
+hold_action:
+  action: more-info
+  entity: binary_sensor.delock_wlan_schalter_online
+```
+
+### 📐 Layout (Responsive Design)
+
+Using `layout-card`, you can create a responsive grid layout.
+
+Example:
+
+```yaml
+type: custom:layout-card
+layout_type: custom:grid-layout
+cards:
+
+  # Add your Room Cards here
+  - type: custom:button-card
+    template: room_card
+    name: Light
+    icon: mdi:home
+    entity: switch.lampen_haus
+
+layout:
+  grid-template-columns: repeat(7, minmax(170px, 1fr))
+  grid-gap: 12px
+  margin: 0
+
+  mediaquery:
+    '(max-width: 600px)':
+      grid-template-columns: repeat(2, minmax(130px, 1fr))
+      margin: 0
+
+grid_options:
+  columns: 36
+  rows: auto
+```
+
+#### Behavior
+
+* Desktop → up to 7 Room Cards per row
+* Mobile → up to 2 Room Cards per row
+
+### 🎨 Design Details
+
+- Circular background highlights based on entity state
+- Dynamic icon coloring (active vs inactive)
+- Compact square layout (`aspect-ratio: 1/1`)
+- Responsive button sizes for mobile devices
+- Clean separation between main control and sub-controls
+
+### 🔧 Customization
+
+#### Change Main Entity
+
+```yaml
+entity: switch.lampen_haus
+```
+
+Use any group or main control entity.
+
+#### Add / Remove Buttons
+
+You can use **0 to 4 buttons**:
+
+```yaml
+custom_fields:
+  btn:
+    card:
+      type: vertical-stack
+      cards:
+        # Add or remove freely
+```
+
+#### Adjust Button Size (Mobile)
+
+```yaml
+@media screen and (max-width: 800px)
+```
+
+Modify this to fit your layout.
+
+#### Modify Colors
+
+Colors are controlled via template logic:
+
+```js
+entity.state === 'on'
+```
+
+You can adapt:
+
+- active color
+- inactive color
+- background opacity
+
+### 🚀 Why Templates?
+
+The entire setup is based on templates to avoid duplication.
+
+Instead of redefining styles for every room:
+
+- define once → reuse everywhere
+- consistent UI
+- easier maintenance
 
 ---
 

@@ -1,0 +1,254 @@
+- type: grid
+  cards:
+    - type: custom:layout-card
+      layout_type: grid
+      layout:
+        grid-template-columns: 1fr
+        grid-gap: 0
+        margin: 0
+        padding: 0
+      cards:
+        - type: custom:button-card
+          entity: sensor.OUTSIDE_TEMPERATURE_SENSOR
+          show_name: false
+          show_icon: false
+          tap_action:
+            action: url
+            url_path: https://my.netatmo.com/app/weather # URL to sensor provider - remove tap_action, if you don't want this feature
+          card_mod:
+            style: |
+              :host {
+                margin: 0 !important;
+              }
+          styles:
+            card:
+              - padding: 16px
+              - border-radius: 1em
+              - display: flex
+              - justify-content: space-between
+              - align-items: center
+              - background: var(--card-background-color)
+              - box-shadow: none
+              - height: 120px
+              - position: relative
+              - margin-top: 5px
+              - margin-bottom: 0
+              - border-bottom-left-radius: 0
+              - border-bottom-right-radius: 0
+            grid:
+              - grid-template-areas: none
+            custom_fields:
+              outdoor:
+                - position: absolute
+                - justify-self: start
+                - top: 15px
+              indoor:
+                - position: absolute
+                - justify-self: end
+                - top: 15px
+          extra_styles: >
+            .outdoor_label {
+              height: 20px;
+              font-size: 0.9em;
+              font-weight: 500;
+              color: var(--secondary-text-color);
+              line-height: 20px;
+            }
+
+            .outdoor_value {
+                font-size: 2.1em;
+                font-weight: 300;
+            }
+
+            :host{
+              --show: 4s;
+              --fade: 0.5s;
+              --cycle: calc(2 * var(--show) + 2 * var(--fade)); /* 5s */
+            }
+
+            .indoor_warning {
+              margin-top: 4px;
+              font-size: 0.75em;
+              font-weight: 400;
+              color: var(--secondary-text-color);
+              width: 280px;
+              text-overflow: ellipsis;
+              overflow: hidden;
+            }
+
+            .rotator{
+              display: grid; 
+              inline-size: fit-content;
+              isolation: isolate;
+            }
+
+            .rotator .slide{
+              grid-area: 1 / 1;
+              will-change: opacity;
+              animation: var(--cycle) linear infinite;
+            }
+
+            @keyframes cycle-a{
+              0%   { opacity: 1; }
+              40%  { opacity: 1; }
+              50%  { opacity: 0; }
+              90%  { opacity: 0; }
+              100% { opacity: 1; }
+            }
+
+            @keyframes cycle-b{
+              0%   { opacity: 0; }
+              40%  { opacity: 0; }
+              50%  { opacity: 1; }
+              90%  { opacity: 1; }
+              100% { opacity: 0; }
+            }
+
+            .rotator .slide.a { animation-name: cycle-a; }
+
+            .rotator .slide.b { animation-name: cycle-b; }
+          custom_fields:
+            outdoor: |
+              [[[
+                const temp = states['sensor.OUTSIDE_TEMPERATURE_SENSOR'].state.replace('.', ','); // Use , instead of . as divider - remove ".replace('.', ',')" if not needed
+                const rain = states['sensor.RAIN_SENSOR'].state.replace('.', ',');  // Use , instead of . as divider - remove ".replace('.', ',')" if not needed
+                const humidity = states['sensor.HUMIDITY_SENSOR'].state;
+                const trend = states['sensor.OUTDOOR_TEMPERATURE_TREND'].state;
+                const outdoor_connected = states['binary_sensor.OUTDOOR_SENSOR_CONNECTED'].state;
+                const rainsensor_connected = states['binary_sensor.RAIN_SENSOR_CONNECTED'].state;
+
+                var returnValue = `
+                  <div style="text-align: left;">
+                    <div class="outdoor_label">Outdoors `;
+
+                switch(trend) {
+                  case "up":
+                    returnValue += `🔺`;
+                    break;
+
+                  case "down":
+                    returnValue += `🔻`;
+                    break;
+
+                  case "stable":
+                    returnValue += `➖`;
+                    break;
+                }
+
+                if (outdoor_connected === "off") {
+                  returnValue += `🚫`;
+                }
+
+                returnValue += `</div>
+                    <div class="outdoor_value">
+                      ${temp} °C
+                    </div>
+                    <div style="margin-top: 3px; font-size: 0.8em; font-weight: 400; color: var(--secondary-text-color);">`;
+
+                    if (rain !== "unavailable") {
+                      returnValue += `🌧️ ${rain} mm`;
+                    } else {
+                      returnValue += `🌧️ ---`;
+                    }
+
+                    if (rainsensor_connected === "off") {
+                      returnValue += ` 🚫`;
+                    }
+
+                    returnValue += `&nbsp;&nbsp;💧 ${humidity} %
+                    </div>
+                  </div>`;
+
+                  return returnValue;
+              ]]]
+            indoor: |
+              [[[
+                const indoor = states['sensor.INDOOR_TEMPERATURE_SENSOR'].state.replace('.', ',');
+                const warnHA = states['sensor.wetterwarnungen_aktuelle_warnstufe'].attributes.warning_count; // provided by Deutscher Wetterdienst (DWD) Weather Warnings
+                const warnNINA = states['binary_sensor.warning_nina']; // provided by NINA
+                let warnOutput = '';
+                let warningOutput = '';
+                let returnValue = '';
+
+                const indoor_co2 = states['sensor.CO2_SENSOR'].state;
+                const indoor_humidity = states['sensor.INDOOR_HUMIDITY_SENSOR'].state;
+
+                if (warnNINA === 'on') {
+                  const name = (states['binary_sensor.warning_nina'].attributes['headline'] || '').toLowerCase().replace(/(^\w{1})|(\s+\w{1})/g, l => l.toUpperCase());
+                  const start = new Date(states['binary_sensor.warning_nina'].attributes['start']);
+                  const startTime = start.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) + ' ' + start.toLocaleTimeString('de-DE', {hour: '2-digit', minute:'2-digit'});
+                  warnOutput += `⚠️ ${name} (${startTime})`;
+                } else if (warnHA > 0) {
+                  const name = (states['sensor.wetterwarnungen_aktuelle_warnstufe'].attributes['warning_1_name'] || '').toLowerCase().replace(/(^\w{1})|(\s+\w{1})/g, l => l.toUpperCase());
+                  const start = new Date(states['sensor.wetterwarnungen_aktuelle_warnstufe'].attributes['warning_1_start']);
+                  const startTime = start.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) + ' ' + start.toLocaleTimeString('de-DE', {hour: '2-digit', minute:'2-digit'});
+                  warnOutput += `⚠️ ${name} (${startTime})`;
+                }
+
+                warningOutput = `🌀 ${indoor_co2} ppm&nbsp;&nbsp;💧 ${indoor_humidity} %`;
+
+                returnValue = `
+                  <div style="text-align: right;">
+                    <div class="outdoor_label">indoor</div>
+                    <div class="outdoor_value">
+                      ${indoor} °C
+                    </div>`;
+
+                if (warnOutput) {
+                  returnValue+= `
+                    <div class="indoor_warning rotator">
+                      <span class="slide a">${warnOutput}</span>
+                      <span class="slide b">${warningOutput}</span>
+                    </div>`;
+                } else {
+                  returnValue+= `
+                    <div class="indoor_warning">
+                      ${warningOutput}
+                    </div>`;
+                }
+
+                returnValue+= `</div>`;
+
+                return returnValue;
+                ]]]
+        - show_current: false
+          show_forecast: true
+          type: weather-forecast
+          entity: weather.berlin
+          forecast_type: daily
+          tap_action:
+            action: url
+            url_path: >-
+              https://www.wetter.com/wetter_aktuell/wettervorhersage/3_tagesvorhersage/deutschland/berlin/DE0001020.html
+          card_mod:
+            style: |
+              ha-card {
+                border-top-left-radius: 0;
+                border-top-right-radius: 0;
+                border-bottom-left-radius: 0;
+                border-bottom-right-radius: 0;
+              }
+
+              :host {
+                margin: 0 !important;
+              }
+        - show_current: false
+          show_forecast: true
+          type: weather-forecast
+          entity: weather.berlin
+          forecast_type: hourly
+          tap_action:
+            action: url
+            url_path: https://www.wetter.com/deutschland/leutenbach/DE0001020.html
+          card_mod:
+            style: |
+              ha-card {
+                border-top-left-radius: 0;
+                border-top-right-radius: 0;
+                margin: 0 !important;
+
+              }
+
+              :host {
+                margin: 0 !important;
+              }

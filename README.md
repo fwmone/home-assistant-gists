@@ -13,6 +13,24 @@ things that solved a concrete problem, improved robustness or performance, or he
   - [Compatibility \& Stability](#compatibility--stability)
 - [Hands-on experience blog: Medium articles \& background](#hands-on-experience-blog-medium-articles--background)
   - [Overview of the articles](#overview-of-the-articles)
+- [Dashboard](#dashboard)
+  - [🌤️ Home Assistant Weather Card (Custom Dashboard Card)](#️-home-assistant-weather-card-custom-dashboard-card)
+    - [✨ Features](#-features)
+    - [📦 Requirements](#-requirements)
+    - [🔌 Required Data Sources](#-required-data-sources)
+      - [Weather / Outdoor](#weather--outdoor)
+      - [Indoor](#indoor)
+      - [Weather \& Disaster Warnings (optional)](#weather--disaster-warnings-optional)
+      - [Weather Forecast](#weather-forecast)
+    - [🧠 How It Works](#-how-it-works)
+    - [⚙️ Configuration](#️-configuration)
+    - [Replace Sensors](#replace-sensors)
+    - [Remove Features](#remove-features)
+    - [Replace Weather Providers](#replace-weather-providers)
+    - [Adjust Formatting](#adjust-formatting)
+    - [🔁 Rotating Warning Display](#-rotating-warning-display)
+    - [🔗 Optional Click Actions](#-optional-click-actions)
+    - [💡 Notes](#-notes)
 - [Scripts](#scripts)
   - [immich\_sync\_favorites](#immich_sync_favorites)
     - [What it does](#what-it-does)
@@ -97,6 +115,151 @@ This article outlines the core principles that make a Home Assistant smart home 
 **5. [eInk Photo Frames from BLOOMIN8 and paperlesspaper](https://medium.com/@fwmone/eink-photo-frames-from-bloomin8-and-paperlesspaper-26c04d9bbf93) / [eInk-Bilderrahmen von BLOOMIN8 und paperlesspaper](https://medium.com/@fwmone/eink-bilderrahmen-von-bloomin8-und-paperlesspaper-a52f8fc84cf4)**
 
 An experience-based look at eInk photo frames and how they can bring photos back into everyday life through local, automated integration with Home Assistant.
+
+---
+
+# Dashboard
+## 🌤️ Home Assistant Weather Card (Custom Dashboard Card)
+
+![Home Assistant Weather Card](/README/weather-card.png)
+
+This is a custom weather card for Home Assistant dashboards, built using `layout-card` and `button-card`.
+
+It combines multiple data sources into a clean, compact, and highly informative UI:
+
+- Outdoor weather data (temperature, humidity, rain, trend)
+- Indoor climate data (temperature, CO₂, humidity)
+- Weather and disaster warnings (DWD + NINA)
+- Daily and hourly weather forecast
+
+The result is a single card that provides everything you need at a glance.
+
+### ✨ Features
+
+- 🌡️ **Outdoor conditions** (temperature, humidity, rain)
+- 🔄 **Temperature trend indicators** (up / down / stable)
+- 🚫 **Sensor availability indicators**
+- 🏠 **Indoor climate data** (temperature, CO₂, humidity)
+- ⚠️ **Weather & disaster warnings** (DWD + NINA - can be removed if not wanted)
+- 🔁 **Rotating display** between warnings and indoor details - can be removed if not wanted
+- 📅 **Daily forecast**
+- 🕒 **Hourly forecast**
+- 🔗 Optional click actions (e.g. open Netatmo or weather provider)
+
+### 📦 Requirements
+
+You need the following custom cards:
+
+- [`layout-card`](https://github.com/thomasloven/lovelace-layout-card)
+- [`button-card`](https://github.com/custom-cards/button-card)
+- [`card-mod`](https://github.com/thomasloven/lovelace-card-mod)
+
+### 🔌 Required Data Sources
+
+You can adapt all sensors, but the following types are expected:
+
+#### Weather / Outdoor
+- Outdoor temperature sensor
+- Outdoor humidity sensor
+- Rain sensor (optional)
+- Temperature trend sensor (optional)
+- Sensor availability (binary sensors, optional)
+
+#### Indoor
+- Indoor temperature sensor
+- CO₂ sensor (optional)
+- Indoor humidity sensor (optional)
+
+#### Weather & Disaster Warnings (optional)
+- Home Assistant integration: **Deutscher Wetterdienst (DWD) Weather Warnings**
+- Home Assistant integration: **NINA**
+
+#### Weather Forecast
+- Any Home Assistant `weather` entity (e.g. DWD)
+
+### 🧠 How It Works
+
+The card is composed of three main parts:
+
+1. **Top Section (Custom Button Card)**
+   - Displays outdoor and indoor data side-by-side
+   - Includes dynamic icons and warning indicators
+   - Rotates between warnings and indoor details
+
+2. **Daily Forecast**
+   - Standard `weather-forecast` card
+
+3. **Hourly Forecast**
+   - Standard `weather-forecast` card
+
+### ⚙️ Configuration
+
+Copy the full YAML configuration into your dashboard.
+
+### Replace Sensors
+
+All sensors can be replaced with your own:
+
+```yaml
+sensor.OUTSIDE_TEMPERATURE_SENSOR
+sensor.INDOOR_TEMPERATURE_SENSOR
+sensor.HUMIDITY_SENSOR
+sensor.CO2_SENSOR
+```
+
+### Remove Features
+
+You can easily remove parts you don’t need:
+
+- Remove rain data if no rain sensor is available
+- Remove CO₂ if not available
+- Remove warnings if not used
+
+### Replace Weather Providers
+
+You are not limited to DWD:
+
+- Any [`weather`](https://www.home-assistant.io/integrations/#weather) entity works
+- Any warning system can be integrated
+
+### Adjust Formatting
+
+Example (decimal separator):
+
+```js
+.replace('.', ',')
+```
+
+Remove this if not needed.
+
+### 🔁 Rotating Warning Display
+
+If warnings are present, the indoor section alternates between:
+
+- ⚠️ Warning information
+- 🌀 Indoor air quality (CO₂ + humidity)
+
+This is implemented using CSS animations.
+
+### 🔗 Optional Click Actions
+
+The card supports click actions, e.g.:
+
+```yaml
+tap_action:
+  action: url
+  url_path: https://my.netatmo.com/app/weather
+```
+
+You can remove or customize this.
+
+### 💡 Notes
+
+- The layout is optimized for a clean, compact dashboard design
+- Works great as part of a main dashboard view
+- Designed for both desktop and mobile usage
+
+---
 
 # Scripts
 ## immich_sync_favorites

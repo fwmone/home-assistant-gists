@@ -59,6 +59,8 @@ things that solved a concrete problem, improved robustness or performance, or he
 - [Scripts](#scripts)
   - [immich\_sync\_favorites](#immich_sync_favorites)
     - [What it does](#what-it-does)
+    - [Breaking changes / migration notes](#breaking-changes--migration-notes)
+    - [How orientation detection works](#how-orientation-detection-works)
     - [Intended use case](#intended-use-case)
     - [Home Assistant integration](#home-assistant-integration)
     - [Why is the API Key not in secrets.yaml?](#why-is-the-api-key-not-in-secretsyaml)
@@ -551,45 +553,96 @@ Instead of redefining styles for every room:
 # Scripts
 ## immich_sync_favorites
 
-`immich_sync_favorites` is a small helper script that synchronizes favorite images from an Immich instance into a Home Assistant–managed environment — optimized for e-ink picture frames using [eink-optimize](https://github.com/fwmone/eink-optimize).
+[`immich_sync_favorites`](https://github.com/fwmone/home-assistant-gists/blob/main/immich_sync_favorites/immich_sync_favorites.sh) is a small helper script that synchronizes favorite images from an Immich instance into a Home Assistant–managed environment and prepares them for e-ink picture frames using [eink-optimize](https://github.com/fwmone/eink-optimize).
 
-The script was developed out of practical use, not as a generic downloader.
-Its purpose is to reliably bridge three worlds:
+The script was developed out of practical use, not as a generic downloader. Its purpose is to reliably bridge three worlds:
 
-- Immich as a photo source and curation tool  
-- Home Assistant as the orchestration layer  
-- E-ink devices (Bloomin8, PaperlessPaper) with very specific rendering constraints  
+- Immich as a photo source and curation tool
+- Home Assistant as the orchestration layer
+- E-ink devices (BLOOMIN8 and paperlesspaper) with device- and orientation-specific rendering constraints
 
 ### What it does
 
-- Queries Immich for all **favorite images** via the metadata search API (paginated)
-- Downloads originals only when required
-- Optimizes images via an external optimization service [eink-optimize](https://github.com/fwmone/eink-optimize).
+- Queries Immich for all **favorite image assets** via `/api/search/metadata`
+- Uses Immich's current structured search filter and cursor-based pagination
+- Reads the normalized `width` and `height` supplied by Immich to determine image orientation without downloading EXIF metadata
+- Separates output automatically into `portrait/` and `landscape/` subdirectories
+- Downloads originals only when optimized output is missing
+- Optimizes images via [eink-optimize](https://github.com/fwmone/eink-optimize)
 - Generates device-specific output variants:
-  - JPEGs for Bloomin8 frames
-  - PNGs for PaperlessPaper frames
-- Keeps local directories in sync by removing files that are no longer favorites
+  - BLOOMIN8: JPEG, `1200 × 1600` (portrait) or `1600 × 1200` (landscape)
+  - paperlesspaper: PNG, `480 × 800` (portrait) or `800 × 480` (landscape)
+- Keeps both orientation directories in sync by removing images that are no longer Immich favorites
+- Removes legacy optimized image files that still reside directly in the old root output directories after a successful sync
 - Exposes a simple status file for monitoring and automations
 
 The script is designed to be:
+
 - idempotent (safe to run repeatedly),
 - conservative with network and storage usage,
-- and predictable in long-term operation.
+- dependency-light (no `jq` required),
+- and predictable in long-term unattended operation.
+
+### Breaking changes / migration notes
+
+The orientation-aware version changes the output directory structure and uses Immich's newer search API format.
+
+**Existing output directories are now treated as root directories.** The script automatically creates two subdirectories below each target:
+
+```text
+/media/picture-frames/bloomin8/
+├── portrait/
+└── landscape/
+
+/media/picture-frames/paperlesspaper/
+├── portrait/
+└── landscape/
+```
+
+This means that consumers which previously read images directly from `DEST_DIR_BLOOMIN8` or `DEST_DIR_PAPERLESSPAPER` must now point to the appropriate `portrait` or `landscape` subdirectory.
+
+For example:
+
+```text
+/media/picture-frames/bloomin8/portrait
+/media/picture-frames/bloomin8/landscape
+```
+
+The values of `DEST_DIR_BLOOMIN8` and `DEST_DIR_PAPERLESSPAPER` themselves **do not need to change**.
+
+On the first successful run after upgrading, the script rebuilds the orientation-specific output as needed and removes legacy optimized image files located directly in the old root directories. It therefore makes sense to verify the new `portrait/` and `landscape/` directories before updating the configuration of your picture-frame integrations.
+
+The Immich query has also changed internally. Favorites are now selected using the structured `filter` syntax and cursor-based pagination rather than the former top-level `isFavorite` field and page-based pagination. This is handled entirely by the script; no additional Home Assistant configuration is required.
+
+### How orientation detection works
+
+Immich already returns `width` and `height` with each asset in the search response, even when `withExif` is disabled. These dimensions are normalized by Immich and can therefore be used directly for orientation detection without having to interpret EXIF orientation flags in the sync script.
+
+The classification is deliberately simple:
+
+```text
+width > height  → landscape
+width <= height → portrait
+```
+
+Square images, as well as the unlikely case of missing or invalid dimensions, are assigned to `portrait` to keep behavior deterministic.
 
 ### Intended use case
 
 This script is **not** meant as a general Immich export tool.
 
 It is intended for setups where:
+
 - favorites are curated manually in Immich,
-- images are displayed passively (e.g. wall frames, ambient displays),
+- images are displayed passively (e.g. wall frames or ambient displays),
+- portrait and landscape frames should receive images in their native orientation,
 - and visual calmness, stability, and low maintenance matter more than immediacy.
 
-Typical execution is automated via Home Assistant (e.g. nightly or a few times per day).
+Typical execution is automated via Home Assistant, for example nightly or a few times per day.
 
 ### Home Assistant integration
 
-The script is usually invoked via a `shell_command` in `configuration.yaml`, with required configuration passed as environment variables:
+The script is usually invoked via a `shell_command` in `configuration.yaml`, with the required configuration passed as environment variables:
 
 ```yaml
 shell_command:
@@ -600,17 +653,19 @@ shell_command:
     DEST_DIR_ORIGINALS="/config/www/picture-frames/originals"
     PUBLISH_DIR="/local/picture-frames/originals"
     DEST_DIR_BLOOMIN8="/media/picture-frames/bloomin8"
-    DEST_DIR_PAPERLESSPAPER="/media/picture-frames/paperlesspaper"    
+    DEST_DIR_PAPERLESSPAPER="/media/picture-frames/paperlesspaper"
     IMMICH_API_KEY="YOUR_IMMICH_API_KEY"
     nohup /config/scripts/immich_sync_favorites.sh
     >/config/scripts/immich_sync_favorites.log 2>&1 &'
 ```
 
+The target directory settings above remain the same with the orientation-aware version. The script creates the `portrait/` and `landscape/` subdirectories automatically.
+
 ### Why is the API Key not in secrets.yaml?
 
-!secret only works as a YAML tag for a complete value, not “inline” in the middle of a string. If you write IMMICH_API_KEY="!secret immich_api_key", HA will simply treat it as a normal string – and bash will receive exactly that string.
+`!secret` only works as a YAML tag for a complete value, not inline in the middle of a string. If you write `IMMICH_API_KEY="!secret immich_api_key"`, Home Assistant will treat it as a normal string and Bash will receive exactly that string.
 
-If you want to have the API key in `secrets.yaml`, the most pragmatic and robust option is to hide the entire command, leaving `configuration.yaml` clean:
+If you want to keep the API key in `secrets.yaml`, the most pragmatic and robust option is to hide the entire command, leaving `configuration.yaml` clean.
 
 In `secrets.yaml`:
 
@@ -656,7 +711,6 @@ template:
         state: >
           {% set parts = states('sensor.immich_sync_raw').split('|') %}
           {{ parts[2] if parts|length > 2 else '' }}
-        # Optional: Leeres Feld nicht als "unknown" behandeln
         availability: >
           {{ states('sensor.immich_sync_raw') not in ['unknown', 'unavailable'] }}
 
@@ -670,36 +724,37 @@ template:
 
 The script expects the following environment variables:
 
-|variable|value|
-|--------|-----|
-|IMMICH_BASE|Base URL of the Immich instance|
-|IMMICH_API_KEY|API key with access to the Immich search and asset endpoints|
-|HOMEASSISTANT_PUBLIC_ADDRESS|Publicly reachable Home Assistant base URL used by the optimizer service. Can be your internal Home Assistant address if einkoptimize is also locally hosted|
-|EINKOPTIMIZE|Endpoint of [eink-optimize](https://github.com/fwmone/eink-optimize)|
+| Variable | Value |
+| --- | --- |
+| `IMMICH_BASE` | Base URL of the Immich instance |
+| `IMMICH_API_KEY` | API key with access to the Immich search and asset endpoints |
+| `HOMEASSISTANT_PUBLIC_ADDRESS` | Home Assistant base URL reachable by the optimizer service. This can be an internal address if eink-optimize is hosted locally and can access it |
+| `EINKOPTIMIZE` | Endpoint of [eink-optimize](https://github.com/fwmone/eink-optimize) |
 
 **Target directories**
 
 All filesystem paths are configurable and must be writable by Home Assistant:
 
-|variable|value|
-|--------|-----|
-|DEST_DIR_ORIGINALS|Temporary storage for downloaded original images|
-|PUBLISH_DIR|Public path used to expose originals to the optimizer service|
-|DEST_DIR_BLOOMIN8|Target directory for Bloomin8-optimized JPEG images|
-|DEST_DIR_PAPERLESSPAPER|Target directory for PaperlessPaper-optimized PNG images|
+| Variable | Value |
+| --- | --- |
+| `DEST_DIR_ORIGINALS` | Temporary storage for downloaded original images |
+| `PUBLISH_DIR` | Public path used to expose originals to the optimizer service |
+| `DEST_DIR_BLOOMIN8` | Root target directory for BLOOMIN8-optimized JPEG images; `portrait/` and `landscape/` are created below it |
+| `DEST_DIR_PAPERLESSPAPER` | Root target directory for paperlesspaper-optimized PNG images; `portrait/` and `landscape/` are created below it |
 
 ### Automation
-In an automation, usage is as simple as that
+
+In an automation, usage is as simple as:
 
 ```yaml
 actions:
   - action: shell_command.immich_sync_favorites
 ```
 
-I enhanced it by an error handling notification and "last sync" sensor like this:
+I enhanced it with error handling and a "last sync" sensor like this:
 
 ```yaml
-alias: "Bloomin8 / paperlesspaper: Immich Favoriten Sync ausführen und Fehler melden"
+alias: "BLOOMIN8 / paperlesspaper: Immich Favoriten Sync ausführen und Fehler melden"
 description: ""
 triggers:
 (...)
@@ -740,18 +795,21 @@ mode: single
 
 ### Notes & limitations
 
-- The script intentionally avoids additional dependencies like jq
-- API changes in Immich may require adjustments
+- The script intentionally avoids additional dependencies such as `jq`; it uses Python 3 for JSON handling
+- It currently targets **image assets** only
+- Orientation is derived from Immich's normalized asset dimensions; square or dimensionless assets fall back to portrait
+- Output sizes are tailored to the BLOOMIN8 and paperlesspaper frame setups described above
+- API changes in Immich may require future adjustments
 - Error handling is pragmatic and optimized for unattended execution
 - This is a focused tool — adapt it to your setup rather than expecting universal defaults
 
 ### Why this exists
 
-This script exists because it solved a real problem in a real home:
-keeping curated photos in sync across e-ink displays without constant attention, UI clutter, or fragile workflows.
+This script exists because it solved a real problem in a real home: keeping curated photos in sync across e-ink displays without constant attention, UI clutter, or fragile workflows.
 
-If it fits your setup, use it.
-If not, treat it as a reference — or a starting point.
+With orientation-aware output, the same Immich favorites collection can now feed both portrait and landscape frames without requiring separate albums or manual file management.
+
+If it fits your setup, use it. If not, treat it as a reference — or a starting point.
 
 # License
 
